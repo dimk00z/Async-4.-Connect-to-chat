@@ -2,8 +2,8 @@ import asyncio
 import aiofiles
 import configargparse
 import logging
-from utils import get_message_with_datetime, parse_args, \
-    decode_message, logging_host_answer, open_connection
+from utils import get_message_with_datetime, get_parser, \
+    decode_message, open_connection, get_answer
 
 
 async def write_chat_line_to_file(chat_file_name, chat_line):
@@ -13,14 +13,25 @@ async def write_chat_line_to_file(chat_file_name, chat_line):
 
 async def listen_to_chat(host, port,
                          chat_file_name, attempts):
-    reader, writer = await open_connection(host, port, attempts)
-    while True:
-        chat_line = await logging_host_answer(reader)
-        await write_chat_line_to_file(chat_file_name, f'{chat_line}\n')
+    async with open_connection(host, port, attempts) as rw:
+        reader = rw[0]
+        while True:
+            chat_line = await get_answer(reader)
+            await write_chat_line_to_file(chat_file_name, f'{chat_line}\n')
+
+
+def get_listener_args(parser):
+    parser.add_argument("-f", '--file_name', default='minechat.history',
+                        help="Chat history file name", type=str)
+    parser.add_argument("-p", '--port', default=5000,
+                        help="Port number", type=int)
+    return parser.parse_args()
 
 
 def main():
-    args = parse_args(is_listener=True)
+    logging.basicConfig(level=logging.DEBUG)
+    parser = get_parser()
+    args = get_listener_args(parser)
     host = args.host
     attempts = args.attempts
     chat_file_name = args.file_name
@@ -29,5 +40,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
     main()
